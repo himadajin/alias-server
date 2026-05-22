@@ -4,15 +4,15 @@ tasks:
   build:
     cmds:
       - mkdir -p bin
-      - go build -o bin/alias-server .
+      - go build -o bin/alias-server ./cmd/alias-server
 
   run:
     cmds:
-      - go run . config.local.json
+      - go run ./cmd/alias-server config.local.json
 
   format:
     cmds:
-      - gofmt -w *.go
+      - gofmt -w cmd/alias-server/*.go
 
   test:
     cmds:

@@ -45,7 +45,8 @@ Sample config: `example/config.json`.
 
 - Keep the implementation simple and dependency-free.
 - Do not add new dependencies unless the user explicitly asks for them.
-- Keep the app as a small root-level `package main`; do not introduce `cmd/` or `internal/` unless the project grows enough to justify it.
+- Keep the binary entrypoint under `cmd/alias-server` as a small `package main`.
+- Do not introduce `internal/` or deeper package splits unless the project grows enough to justify it.
 
 ## Agent Workflow
 

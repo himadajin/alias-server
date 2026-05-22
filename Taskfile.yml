@@ -1,0 +1,15 @@
+version: '3'
+
+tasks:
+  build:
+    cmds:
+      - mkdir -p bin
+      - go build -o bin/alias-server .
+
+  test:
+    cmds:
+      - go test ./...
+
+  clean:
+    cmds:
+      - rm -rf bin

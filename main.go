@@ -1,9 +1,14 @@
 package main
 
 import (
+	"bufio"
+	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
+	"log"
+	"net"
 	"net/http"
 	"os"
 )
@@ -26,7 +31,33 @@ func run(args []string) error {
 
 func serve(options runOptions) error {
 	addr := fmt.Sprintf(":%d", options.port)
-	return http.ListenAndServe(addr, newHandler(options.links))
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		return err
+	}
+
+	logger := log.New(os.Stdout, "", log.LstdFlags)
+	server := &http.Server{
+		Handler: withRequestLogging(newHandler(options.links), logger),
+	}
+	serverInfo := serverInfo{
+		port:      options.port,
+		linkCount: len(options.links),
+	}
+
+	printServerStartup(os.Stdout, logger, serverInfo)
+	if stdinIsTerminal() {
+		go handleShortcuts(os.Stdin, os.Stdout, logger, serverInfo, func() {
+			if err := server.Shutdown(context.Background()); err != nil {
+				logger.Printf("shutdown error: %v", err)
+			}
+		})
+	}
+
+	if err := server.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		return err
+	}
+	return nil
 }
 
 type runOptions struct {
@@ -88,4 +119,53 @@ func flagWasSet(flags *flag.FlagSet, name string) bool {
 		}
 	})
 	return wasSet
+}
+
+type serverInfo struct {
+	port      int
+	linkCount int
+}
+
+func printServerStartup(w io.Writer, logger *log.Logger, info serverInfo) {
+	printServerInfo(w, info)
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, "Events:")
+	logServerURL(logger, info)
+	logger.Printf("loaded %d links", info.linkCount)
+}
+
+func printServerInfo(w io.Writer, info serverInfo) {
+	fmt.Fprintln(w, "  Shortcuts: c clear, u url, q quit")
+}
+
+func logServerURL(logger *log.Logger, info serverInfo) {
+	logger.Printf("serving at http://localhost:%d/", info.port)
+}
+
+func clearScreen(w io.Writer, logger *log.Logger, info serverInfo) {
+	fmt.Fprint(w, "\033[H\033[2J")
+	printServerStartup(w, logger, info)
+}
+
+func handleShortcuts(r io.Reader, w io.Writer, logger *log.Logger, info serverInfo, shutdown func()) {
+	scanner := bufio.NewScanner(r)
+	for scanner.Scan() {
+		switch scanner.Text() {
+		case "c":
+			clearScreen(w, logger, info)
+		case "u":
+			logServerURL(logger, info)
+		case "q":
+			shutdown()
+			return
+		}
+	}
+}
+
+func stdinIsTerminal() bool {
+	info, err := os.Stdin.Stat()
+	if err != nil {
+		return false
+	}
+	return info.Mode()&os.ModeCharDevice != 0
 }

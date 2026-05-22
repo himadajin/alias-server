@@ -1,6 +1,11 @@
 package main
 
-import "testing"
+import (
+	"bytes"
+	"log"
+	"strings"
+	"testing"
+)
 
 func TestParseCLIArgsUsesDefaultPort(t *testing.T) {
 	t.Parallel()
@@ -156,5 +161,131 @@ func TestResolvePort(t *testing.T) {
 				t.Fatalf("resolvePort() = %d, want %d", got, test.want)
 			}
 		})
+	}
+}
+
+func TestPrintServerStartup(t *testing.T) {
+	t.Parallel()
+
+	var out bytes.Buffer
+	logger := log.New(&out, "", log.LstdFlags)
+
+	printServerStartup(&out, logger, serverInfo{port: 15555, linkCount: 3})
+
+	got := out.String()
+	for _, want := range []string{
+		"  Shortcuts: c clear, u url, q quit\n",
+		"\nEvents:\n",
+		"serving at http://localhost:15555/\n",
+		"loaded 3 links\n",
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("printServerStartup() output = %q, want to contain %q", got, want)
+		}
+	}
+	for _, unwanted := range []string{
+		"Local:",
+		"Links:",
+		"alias-server started",
+		"alias-server ready",
+		"server listening",
+	} {
+		if strings.Contains(got, unwanted) {
+			t.Fatalf("printServerStartup() output = %q, want no %q", got, unwanted)
+		}
+	}
+	if eventsIndex := strings.Index(got, "Events:\n"); eventsIndex == -1 {
+		t.Fatalf("printServerStartup() output = %q, want Events header", got)
+	} else if servingIndex := strings.Index(got, "serving at http://localhost:15555/\n"); servingIndex == -1 || servingIndex < eventsIndex {
+		t.Fatalf("printServerStartup() output = %q, want Events before serving log", got)
+	}
+}
+
+func TestPrintServerInfo(t *testing.T) {
+	t.Parallel()
+
+	var out bytes.Buffer
+
+	printServerInfo(&out, serverInfo{port: 15555, linkCount: 3})
+
+	got := out.String()
+	for _, want := range []string{
+		"  Shortcuts: c clear, u url, q quit\n",
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("printServerInfo() output = %q, want to contain %q", got, want)
+		}
+	}
+	for _, unwanted := range []string{"Events:", "Local:", "Links:", "serving at"} {
+		if strings.Contains(got, unwanted) {
+			t.Fatalf("printServerInfo() output = %q, want no %q", got, unwanted)
+		}
+	}
+}
+
+func TestClearScreenPrintsEscapeAndServerStartup(t *testing.T) {
+	t.Parallel()
+
+	var out bytes.Buffer
+	logger := log.New(&out, "", log.LstdFlags)
+
+	clearScreen(&out, logger, serverInfo{port: 15555, linkCount: 1})
+
+	got := out.String()
+	if !strings.HasPrefix(got, "\033[H\033[2J") {
+		t.Fatalf("clearScreen() output = %q, want ANSI clear prefix", got)
+	}
+	if !strings.Contains(got, "serving at http://localhost:15555/\n") {
+		t.Fatalf("clearScreen() output = %q, want serving log", got)
+	}
+	if !strings.Contains(got, "loaded 1 links\n") {
+		t.Fatalf("clearScreen() output = %q, want link count log", got)
+	}
+	if !strings.Contains(got, "\nEvents:\n") {
+		t.Fatalf("clearScreen() output = %q, want Events header", got)
+	}
+}
+
+func TestHandleShortcutsQuits(t *testing.T) {
+	t.Parallel()
+
+	var out bytes.Buffer
+	logger := log.New(&out, "", log.LstdFlags)
+	called := false
+
+	handleShortcuts(strings.NewReader("q\n"), &out, logger, serverInfo{port: 15555, linkCount: 1}, func() {
+		called = true
+	})
+
+	if !called {
+		t.Fatal("handleShortcuts() did not call shutdown")
+	}
+	if out.Len() != 0 {
+		t.Fatalf("handleShortcuts() output = %q, want empty", out.String())
+	}
+}
+
+func TestHandleShortcutsClearsAndPrintsURL(t *testing.T) {
+	t.Parallel()
+
+	var out bytes.Buffer
+	logger := log.New(&out, "", log.LstdFlags)
+
+	handleShortcuts(strings.NewReader("c\nu\n"), &out, logger, serverInfo{port: 15555, linkCount: 1}, func() {
+		t.Fatal("shutdown called")
+	})
+
+	got := out.String()
+	if !strings.Contains(got, "\033[H\033[2J") {
+		t.Fatalf("handleShortcuts() output = %q, want clear sequence", got)
+	}
+	if count := strings.Count(got, "serving at http://localhost:15555/\n"); count != 2 {
+		t.Fatalf("serving log count = %d, want 2 in output %q", count, got)
+	}
+	if count := strings.Count(got, "Events:\n"); count != 1 {
+		t.Fatalf("Events header count = %d, want 1 in output %q", count, got)
+	}
+	if count := strings.Count(got, "  Shortcuts: c clear, u url, q quit\n"); count != 1 {
+		t.Fatalf("Shortcuts count = %d, want 1 in output %q", count, got)
 	}
 }

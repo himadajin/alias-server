@@ -1,8 +1,10 @@
 package main
 
 import (
+	"log"
 	"net/http"
 	"strings"
+	"time"
 )
 
 func newHandler(links map[string]string) http.Handler {
@@ -46,4 +48,39 @@ func linkNameFromRequest(r *http.Request) (string, bool) {
 	}
 
 	return name, true
+}
+
+func withRequestLogging(next http.Handler, logger *log.Logger) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		rec := &statusRecorder{
+			ResponseWriter: w,
+			status:         http.StatusOK,
+		}
+
+		next.ServeHTTP(rec, r)
+
+		message := "%s %s %d %s"
+		args := []any{
+			r.Method,
+			r.URL.RequestURI(),
+			rec.status,
+			time.Since(start).Round(time.Microsecond),
+		}
+		if location := rec.Header().Get("Location"); location != "" {
+			message += " -> %s"
+			args = append(args, location)
+		}
+		logger.Printf(message, args...)
+	})
+}
+
+type statusRecorder struct {
+	http.ResponseWriter
+	status int
+}
+
+func (r *statusRecorder) WriteHeader(status int) {
+	r.status = status
+	r.ResponseWriter.WriteHeader(status)
 }

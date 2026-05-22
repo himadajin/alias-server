@@ -1,0 +1,8 @@
+{
+  "defaultPort": 15555,
+  "links": {
+    "go": "https://go.dev/",
+    "pkg": "https://pkg.go.dev/",
+    "repo": "https://github.com/"
+  }
+}

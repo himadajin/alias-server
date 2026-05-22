@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"log"
 	"strings"
 	"testing"
@@ -365,6 +366,28 @@ func TestHandleShortcutsClearsAndPrintsURL(t *testing.T) {
 	if count := strings.Count(got, "Shortcuts\n"); count != 1 {
 		t.Fatalf("Shortcuts count = %d, want 1 in output %q", count, got)
 	}
+}
+
+func TestHandleShortcutsLogsScannerError(t *testing.T) {
+	t.Parallel()
+
+	var out bytes.Buffer
+	logger := log.New(&out, "", log.LstdFlags)
+
+	handleShortcuts(errorReader{}, &out, logger, testServerInfo(), func() {
+		t.Fatal("shutdown called")
+	})
+
+	got := out.String()
+	if !strings.Contains(got, "shortcut input error: read failed\n") {
+		t.Fatalf("handleShortcuts() log = %q, want scanner error", got)
+	}
+}
+
+type errorReader struct{}
+
+func (errorReader) Read([]byte) (int, error) {
+	return 0, errors.New("read failed")
 }
 
 func testServerInfo() serverInfo {

@@ -190,6 +190,9 @@ func handleShortcuts(r io.Reader, w io.Writer, logger *log.Logger, info serverIn
 			return
 		}
 	}
+	if err := scanner.Err(); err != nil {
+		logger.Printf("shortcut input error: %v", err)
+	}
 }
 
 func sortedLinkNames(links map[string]string) []string {

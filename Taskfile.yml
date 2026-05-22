@@ -1,0 +1,23 @@
+version: '3'
+
+tasks:
+  build:
+    cmds:
+      - mkdir -p bin
+      - go build -o bin/alias-server .
+
+  run:
+    cmds:
+      - go run . config.local.json
+
+  format:
+    cmds:
+      - gofmt -w *.go
+
+  test:
+    cmds:
+      - go test ./...
+
+  clean:
+    cmds:
+      - rm -rf bin

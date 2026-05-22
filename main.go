@@ -11,6 +11,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"sort"
 )
 
 func main() {
@@ -41,8 +42,8 @@ func serve(options runOptions) error {
 		Handler: withRequestLogging(newHandler(options.links), logger),
 	}
 	serverInfo := serverInfo{
-		port:      options.port,
-		linkCount: len(options.links),
+		port:  options.port,
+		links: options.links,
 	}
 
 	printServerStartup(os.Stdout, logger, serverInfo)
@@ -122,20 +123,29 @@ func flagWasSet(flags *flag.FlagSet, name string) bool {
 }
 
 type serverInfo struct {
-	port      int
-	linkCount int
+	port  int
+	links map[string]string
 }
 
 func printServerStartup(w io.Writer, logger *log.Logger, info serverInfo) {
-	printServerInfo(w, info)
+	printServerLinks(w, info)
+	fmt.Fprintln(w)
+	printServerShortcuts(w)
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Events:")
 	logServerURL(logger, info)
-	logger.Printf("loaded %d links", info.linkCount)
 }
 
-func printServerInfo(w io.Writer, info serverInfo) {
-	fmt.Fprintln(w, "  Shortcuts: c clear, u url, q quit")
+func printServerLinks(w io.Writer, info serverInfo) {
+	fmt.Fprintln(w, "Links:")
+	for _, name := range sortedLinkNames(info.links) {
+		fmt.Fprintf(w, "  http://localhost:%d/%s -> %s\n", info.port, name, info.links[name])
+	}
+}
+
+func printServerShortcuts(w io.Writer) {
+	fmt.Fprintln(w, "Shortcuts:")
+	fmt.Fprintln(w, "  c clear, u links, q quit")
 }
 
 func logServerURL(logger *log.Logger, info serverInfo) {
@@ -154,12 +164,21 @@ func handleShortcuts(r io.Reader, w io.Writer, logger *log.Logger, info serverIn
 		case "c":
 			clearScreen(w, logger, info)
 		case "u":
-			logServerURL(logger, info)
+			printServerLinks(w, info)
 		case "q":
 			shutdown()
 			return
 		}
 	}
+}
+
+func sortedLinkNames(links map[string]string) []string {
+	names := make([]string, 0, len(links))
+	for name := range links {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
 }
 
 func stdinIsTerminal() bool {

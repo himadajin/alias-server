@@ -174,13 +174,13 @@ func TestPrintServerStartup(t *testing.T) {
 
 	got := out.String()
 	for _, want := range []string{
-		"Links:\n",
-		"  http://localhost:15555/go -> https://go.dev/\n",
-		"  http://localhost:15555/pkg -> https://pkg.go.dev/\n",
+		"Links\n",
+		"  http://localhost:15555/go   -> https://go.dev/\n",
+		"  http://localhost:15555/pkg  -> https://pkg.go.dev/\n",
 		"  http://localhost:15555/repo -> https://github.com/\n",
-		"\nShortcuts:\n",
-		"  c clear, u links, q quit\n",
-		"\nEvents:\n",
+		"\nShortcuts\n",
+		"  c clear   u links   q quit\n",
+		"\nEvents\n",
 		"serving at http://localhost:15555/\n",
 	} {
 		if !strings.Contains(got, want) {
@@ -199,16 +199,19 @@ func TestPrintServerStartup(t *testing.T) {
 			t.Fatalf("printServerStartup() output = %q, want no %q", got, unwanted)
 		}
 	}
-	if eventsIndex := strings.Index(got, "Events:\n"); eventsIndex == -1 {
+	if eventsIndex := strings.Index(got, "Events\n"); eventsIndex == -1 {
 		t.Fatalf("printServerStartup() output = %q, want Events header", got)
 	} else if servingIndex := strings.Index(got, "serving at http://localhost:15555/\n"); servingIndex == -1 || servingIndex < eventsIndex {
 		t.Fatalf("printServerStartup() output = %q, want Events before serving log", got)
 	}
 	assertInOrder(t, got,
-		"http://localhost:15555/go -> https://go.dev/",
-		"http://localhost:15555/pkg -> https://pkg.go.dev/",
+		"http://localhost:15555/go   -> https://go.dev/",
+		"http://localhost:15555/pkg  -> https://pkg.go.dev/",
 		"http://localhost:15555/repo -> https://github.com/",
 	)
+	if strings.Contains(got, "\033[") {
+		t.Fatalf("printServerStartup() output = %q, want no ANSI codes", got)
+	}
 }
 
 func TestPrintServerLinks(t *testing.T) {
@@ -220,9 +223,9 @@ func TestPrintServerLinks(t *testing.T) {
 
 	got := out.String()
 	for _, want := range []string{
-		"Links:\n",
-		"  http://localhost:15555/go -> https://go.dev/\n",
-		"  http://localhost:15555/pkg -> https://pkg.go.dev/\n",
+		"Links\n",
+		"  http://localhost:15555/go   -> https://go.dev/\n",
+		"  http://localhost:15555/pkg  -> https://pkg.go.dev/\n",
 		"  http://localhost:15555/repo -> https://github.com/\n",
 	} {
 		if !strings.Contains(got, want) {
@@ -230,11 +233,11 @@ func TestPrintServerLinks(t *testing.T) {
 		}
 	}
 	assertInOrder(t, got,
-		"http://localhost:15555/go -> https://go.dev/",
-		"http://localhost:15555/pkg -> https://pkg.go.dev/",
+		"http://localhost:15555/go   -> https://go.dev/",
+		"http://localhost:15555/pkg  -> https://pkg.go.dev/",
 		"http://localhost:15555/repo -> https://github.com/",
 	)
-	for _, unwanted := range []string{"Events:", "Shortcuts:", "Local:", "Links: 3", "serving at", "loaded"} {
+	for _, unwanted := range []string{"Events\n", "Shortcuts\n", "Local:", "Links: 3", "serving at", "loaded"} {
 		if strings.Contains(got, unwanted) {
 			t.Fatalf("printServerLinks() output = %q, want no %q", got, unwanted)
 		}
@@ -246,20 +249,44 @@ func TestPrintServerShortcuts(t *testing.T) {
 
 	var out bytes.Buffer
 
-	printServerShortcuts(&out)
+	printServerShortcuts(&out, false)
 
 	got := out.String()
 	for _, want := range []string{
-		"Shortcuts:\n",
-		"  c clear, u links, q quit\n",
+		"Shortcuts\n",
+		"  c clear   u links   q quit\n",
 	} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("printServerShortcuts() output = %q, want to contain %q", got, want)
 		}
 	}
-	for _, unwanted := range []string{"Events:", "Links:", "serving at"} {
+	for _, unwanted := range []string{"Events\n", "Links\n", "serving at"} {
 		if strings.Contains(got, unwanted) {
 			t.Fatalf("printServerShortcuts() output = %q, want no %q", got, unwanted)
+		}
+	}
+}
+
+func TestPrintServerStartupWithColor(t *testing.T) {
+	t.Parallel()
+
+	var out bytes.Buffer
+	logger := log.New(&out, "", log.LstdFlags)
+	info := testServerInfo()
+	info.color = true
+
+	printServerStartup(&out, logger, info)
+
+	got := out.String()
+	for _, want := range []string{
+		"\033[1mLinks\033[0m\n",
+		"\033[36mhttp://localhost:15555/go\033[0m   \033[2m->\033[0m \033[36mhttps://go.dev/\033[0m\n",
+		"\033[1mShortcuts\033[0m\n",
+		"  \033[1mc\033[0m clear   \033[1mu\033[0m links   \033[1mq\033[0m quit\n",
+		"\033[1mEvents\033[0m\n",
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("printServerStartup() output = %q, want to contain %q", got, want)
 		}
 	}
 }
@@ -279,13 +306,13 @@ func TestClearScreenPrintsEscapeAndServerStartup(t *testing.T) {
 	if !strings.Contains(got, "serving at http://localhost:15555/\n") {
 		t.Fatalf("clearScreen() output = %q, want serving log", got)
 	}
-	if !strings.Contains(got, "Links:\n") {
+	if !strings.Contains(got, "Links\n") {
 		t.Fatalf("clearScreen() output = %q, want links header", got)
 	}
-	if !strings.Contains(got, "Shortcuts:\n") {
+	if !strings.Contains(got, "Shortcuts\n") {
 		t.Fatalf("clearScreen() output = %q, want shortcuts header", got)
 	}
-	if !strings.Contains(got, "\nEvents:\n") {
+	if !strings.Contains(got, "\nEvents\n") {
 		t.Fatalf("clearScreen() output = %q, want Events header", got)
 	}
 }
@@ -323,19 +350,19 @@ func TestHandleShortcutsClearsAndPrintsURL(t *testing.T) {
 	if !strings.Contains(got, "\033[H\033[2J") {
 		t.Fatalf("handleShortcuts() output = %q, want clear sequence", got)
 	}
-	if count := strings.Count(got, "Links:\n"); count != 2 {
+	if count := strings.Count(got, "Links\n"); count != 2 {
 		t.Fatalf("Links header count = %d, want 2 in output %q", count, got)
 	}
-	if count := strings.Count(got, "http://localhost:15555/go -> https://go.dev/\n"); count != 2 {
+	if count := strings.Count(got, "http://localhost:15555/go   -> https://go.dev/\n"); count != 2 {
 		t.Fatalf("go link count = %d, want 2 in output %q", count, got)
 	}
-	if count := strings.Count(got, "Events:\n"); count != 1 {
+	if count := strings.Count(got, "Events\n"); count != 1 {
 		t.Fatalf("Events header count = %d, want 1 in output %q", count, got)
 	}
 	if count := strings.Count(got, "serving at http://localhost:15555/\n"); count != 1 {
 		t.Fatalf("serving log count = %d, want 1 in output %q", count, got)
 	}
-	if count := strings.Count(got, "Shortcuts:\n"); count != 1 {
+	if count := strings.Count(got, "Shortcuts\n"); count != 1 {
 		t.Fatalf("Shortcuts count = %d, want 1 in output %q", count, got)
 	}
 }

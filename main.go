@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"sort"
+	"strings"
 )
 
 func main() {
@@ -44,6 +45,7 @@ func serve(options runOptions) error {
 	serverInfo := serverInfo{
 		port:  options.port,
 		links: options.links,
+		color: stdoutIsTerminal(),
 	}
 
 	printServerStartup(os.Stdout, logger, serverInfo)
@@ -125,27 +127,45 @@ func flagWasSet(flags *flag.FlagSet, name string) bool {
 type serverInfo struct {
 	port  int
 	links map[string]string
+	color bool
 }
 
 func printServerStartup(w io.Writer, logger *log.Logger, info serverInfo) {
 	printServerLinks(w, info)
 	fmt.Fprintln(w)
-	printServerShortcuts(w)
+	printServerShortcuts(w, info.color)
 	fmt.Fprintln(w)
-	fmt.Fprintln(w, "Events:")
+	fmt.Fprintln(w, styleBold("Events", info.color))
 	logServerURL(logger, info)
 }
 
 func printServerLinks(w io.Writer, info serverInfo) {
-	fmt.Fprintln(w, "Links:")
-	for _, name := range sortedLinkNames(info.links) {
-		fmt.Fprintf(w, "  http://localhost:%d/%s -> %s\n", info.port, name, info.links[name])
+	fmt.Fprintln(w, styleBold("Links", info.color))
+	names := sortedLinkNames(info.links)
+	width := maxLocalURLWidth(info, names)
+	for _, name := range names {
+		localURL := fmt.Sprintf("http://localhost:%d/%s", info.port, name)
+		targetURL := info.links[name]
+		fmt.Fprintf(
+			w,
+			"  %s%s %s %s\n",
+			styleCyan(localURL, info.color),
+			strings.Repeat(" ", width-len(localURL)),
+			styleDim("->", info.color),
+			styleCyan(targetURL, info.color),
+		)
 	}
 }
 
-func printServerShortcuts(w io.Writer) {
-	fmt.Fprintln(w, "Shortcuts:")
-	fmt.Fprintln(w, "  c clear, u links, q quit")
+func printServerShortcuts(w io.Writer, color bool) {
+	fmt.Fprintln(w, styleBold("Shortcuts", color))
+	fmt.Fprintf(
+		w,
+		"  %s clear   %s links   %s quit\n",
+		styleBold("c", color),
+		styleBold("u", color),
+		styleBold("q", color),
+	)
 }
 
 func logServerURL(logger *log.Logger, info serverInfo) {
@@ -181,10 +201,48 @@ func sortedLinkNames(links map[string]string) []string {
 	return names
 }
 
+func maxLocalURLWidth(info serverInfo, names []string) int {
+	width := 0
+	for _, name := range names {
+		localURL := fmt.Sprintf("http://localhost:%d/%s", info.port, name)
+		if len(localURL) > width {
+			width = len(localURL)
+		}
+	}
+	return width
+}
+
 func stdinIsTerminal() bool {
 	info, err := os.Stdin.Stat()
 	if err != nil {
 		return false
 	}
 	return info.Mode()&os.ModeCharDevice != 0
+}
+
+func stdoutIsTerminal() bool {
+	info, err := os.Stdout.Stat()
+	if err != nil {
+		return false
+	}
+	return info.Mode()&os.ModeCharDevice != 0
+}
+
+func styleBold(text string, color bool) string {
+	return style(text, color, "1")
+}
+
+func styleCyan(text string, color bool) string {
+	return style(text, color, "36")
+}
+
+func styleDim(text string, color bool) string {
+	return style(text, color, "2")
+}
+
+func style(text string, color bool, code string) string {
+	if !color {
+		return text
+	}
+	return "\033[" + code + "m" + text + "\033[0m"
 }

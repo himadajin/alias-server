@@ -3,7 +3,6 @@ package main
 import (
 	"log"
 	"net/http"
-	"strings"
 	"time"
 )
 
@@ -15,13 +14,13 @@ func newHandler(links map[string]string) http.Handler {
 			return
 		}
 
-		name, ok := linkNameFromRequest(r)
-		if !ok {
+		requestURL := interpretRequestURL(r.URL)
+		if !requestURL.valid {
 			http.NotFound(w, r)
 			return
 		}
 
-		target, ok := links[name]
+		target, ok := links[requestURL.linkName]
 		if !ok {
 			http.NotFound(w, r)
 			return
@@ -29,25 +28,6 @@ func newHandler(links map[string]string) http.Handler {
 
 		http.Redirect(w, r, target, http.StatusFound)
 	})
-}
-
-func linkNameFromRequest(r *http.Request) (string, bool) {
-	if r.URL.RawQuery != "" {
-		return "", false
-	}
-	if r.URL.RawPath != "" {
-		return "", false
-	}
-	if !strings.HasPrefix(r.URL.Path, "/") {
-		return "", false
-	}
-
-	name := strings.TrimPrefix(r.URL.Path, "/")
-	if !isValidLinkName(name) {
-		return "", false
-	}
-
-	return name, true
 }
 
 func withRequestLogging(next http.Handler, logger *log.Logger) http.Handler {

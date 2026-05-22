@@ -16,8 +16,8 @@ const (
 var linkNamePattern = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$`)
 
 type Config struct {
-	Port  int               `json:"port"`
-	Links map[string]string `json:"links"`
+	DefaultPort *int              `json:"defaultPort,omitempty"`
+	Links       map[string]string `json:"links"`
 }
 
 func loadConfig(path string) (Config, error) {
@@ -39,8 +39,8 @@ func loadConfig(path string) (Config, error) {
 }
 
 func validateConfig(config Config) error {
-	if config.Port < minPort || config.Port > maxPort {
-		return fmt.Errorf("port must be between %d and %d", minPort, maxPort)
+	if config.DefaultPort != nil && !isValidPort(*config.DefaultPort) {
+		return fmt.Errorf("defaultPort must be between %d and %d", minPort, maxPort)
 	}
 	if len(config.Links) == 0 {
 		return fmt.Errorf("links must contain at least one entry")
@@ -60,6 +60,10 @@ func validateConfig(config Config) error {
 
 func isValidLinkName(name string) bool {
 	return linkNamePattern.MatchString(name)
+}
+
+func isValidPort(port int) bool {
+	return port >= minPort && port <= maxPort
 }
 
 func isValidTargetURL(raw string) bool {

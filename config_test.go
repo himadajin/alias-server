@@ -10,7 +10,7 @@ func TestLoadConfig(t *testing.T) {
 	t.Parallel()
 
 	file := writeTempConfig(t, `{
-		"port": 55555,
+		"defaultPort": 55555,
 		"links": {
 			"go": "https://go.dev/",
 			"pkg": "https://pkg.go.dev/"
@@ -21,11 +21,32 @@ func TestLoadConfig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("loadConfig() error = %v", err)
 	}
-	if config.Port != 55555 {
-		t.Fatalf("config.Port = %d, want 55555", config.Port)
+	if config.DefaultPort == nil {
+		t.Fatal("config.DefaultPort = nil, want 55555")
+	}
+	if *config.DefaultPort != 55555 {
+		t.Fatalf("*config.DefaultPort = %d, want 55555", *config.DefaultPort)
 	}
 	if config.Links["go"] != "https://go.dev/" {
 		t.Fatalf("config.Links[go] = %q, want https://go.dev/", config.Links["go"])
+	}
+}
+
+func TestLoadConfigAllowsOmittedDefaultPort(t *testing.T) {
+	t.Parallel()
+
+	file := writeTempConfig(t, `{
+		"links": {
+			"go": "https://go.dev/"
+		}
+	}`)
+
+	config, err := loadConfig(file)
+	if err != nil {
+		t.Fatalf("loadConfig() error = %v", err)
+	}
+	if config.DefaultPort != nil {
+		t.Fatalf("config.DefaultPort = %d, want nil", *config.DefaultPort)
 	}
 }
 
@@ -47,38 +68,45 @@ func TestValidateConfigRejectsInvalidConfig(t *testing.T) {
 		config Config
 	}{
 		{
-			name: "port too low",
+			name: "default port too low",
 			config: Config{
-				Port:  0,
-				Links: map[string]string{"go": "https://go.dev/"},
+				DefaultPort: intPtr(0),
+				Links:       map[string]string{"go": "https://go.dev/"},
 			},
 		},
 		{
-			name: "port too high",
+			name: "default port negative",
 			config: Config{
-				Port:  65536,
-				Links: map[string]string{"go": "https://go.dev/"},
+				DefaultPort: intPtr(-1),
+				Links:       map[string]string{"go": "https://go.dev/"},
+			},
+		},
+		{
+			name: "default port too high",
+			config: Config{
+				DefaultPort: intPtr(65536),
+				Links:       map[string]string{"go": "https://go.dev/"},
 			},
 		},
 		{
 			name: "empty links",
 			config: Config{
-				Port:  55555,
-				Links: map[string]string{},
+				DefaultPort: intPtr(55555),
+				Links:       map[string]string{},
 			},
 		},
 		{
 			name: "invalid link name",
 			config: Config{
-				Port:  55555,
-				Links: map[string]string{"Go": "https://go.dev/"},
+				DefaultPort: intPtr(55555),
+				Links:       map[string]string{"Go": "https://go.dev/"},
 			},
 		},
 		{
 			name: "invalid target URL",
 			config: Config{
-				Port:  55555,
-				Links: map[string]string{"go": "go.dev"},
+				DefaultPort: intPtr(55555),
+				Links:       map[string]string{"go": "go.dev"},
 			},
 		},
 	}
@@ -148,4 +176,8 @@ func writeTempConfig(t *testing.T, content string) string {
 	}
 
 	return file.Name()
+}
+
+func intPtr(value int) *int {
+	return &value
 }

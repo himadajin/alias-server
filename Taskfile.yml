@@ -6,6 +6,10 @@ tasks:
       - mkdir -p bin
       - go build -o bin/alias-server .
 
+  run:
+    cmds:
+      - go run . config.local.json
+
   test:
     cmds:
       - go test ./...

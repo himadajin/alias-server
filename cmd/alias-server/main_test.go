@@ -215,6 +215,7 @@ func TestPrintServerStartup(t *testing.T) {
 		}
 	}
 	for _, unwanted := range []string{
+		"Index\n",
 		"Local:",
 		"Links: 3",
 		"loaded 3 links",
@@ -241,6 +242,37 @@ func TestPrintServerStartup(t *testing.T) {
 	}
 }
 
+func TestPrintServerStartupWithIndex(t *testing.T) {
+	t.Parallel()
+
+	var out bytes.Buffer
+	logger := log.New(&out, "", log.LstdFlags)
+
+	printServerStartup(&out, logger, testServerInfoWithIndex())
+
+	got := out.String()
+	for _, want := range []string{
+		"Index\n",
+		"  http://localhost:15555/index\n",
+		"\nLinks\n",
+		"  http://localhost:15555/go   -> https://go.dev/\n",
+		"\nShortcuts\n",
+		"\nEvents\n",
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("printServerStartup() output = %q, want to contain %q", got, want)
+		}
+	}
+	assertInOrder(t, got,
+		"Index\n",
+		"http://localhost:15555/index",
+		"Links\n",
+		"http://localhost:15555/go   -> https://go.dev/",
+		"Shortcuts\n",
+		"Events\n",
+	)
+}
+
 func TestPrintServerLinks(t *testing.T) {
 	t.Parallel()
 
@@ -264,7 +296,42 @@ func TestPrintServerLinks(t *testing.T) {
 		"http://localhost:15555/pkg  -> https://pkg.go.dev/",
 		"http://localhost:15555/repo -> https://github.com/",
 	)
-	for _, unwanted := range []string{"Events\n", "Shortcuts\n", "Local:", "Links: 3", "serving at", "loaded"} {
+	for _, unwanted := range []string{"Index\n", "Events\n", "Shortcuts\n", "Local:", "Links: 3", "serving at", "loaded"} {
+		if strings.Contains(got, unwanted) {
+			t.Fatalf("printServerLinks() output = %q, want no %q", got, unwanted)
+		}
+	}
+}
+
+func TestPrintServerLinksWithIndex(t *testing.T) {
+	t.Parallel()
+
+	var out bytes.Buffer
+
+	printServerLinks(&out, testServerInfoWithIndex())
+
+	got := out.String()
+	for _, want := range []string{
+		"Index\n",
+		"  http://localhost:15555/index\n",
+		"\nLinks\n",
+		"  http://localhost:15555/go   -> https://go.dev/\n",
+		"  http://localhost:15555/pkg  -> https://pkg.go.dev/\n",
+		"  http://localhost:15555/repo -> https://github.com/\n",
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("printServerLinks() output = %q, want to contain %q", got, want)
+		}
+	}
+	assertInOrder(t, got,
+		"Index\n",
+		"http://localhost:15555/index",
+		"Links\n",
+		"http://localhost:15555/go   -> https://go.dev/",
+		"http://localhost:15555/pkg  -> https://pkg.go.dev/",
+		"http://localhost:15555/repo -> https://github.com/",
+	)
+	for _, unwanted := range []string{"Events\n", "Shortcuts\n", "serving at", "loaded"} {
 		if strings.Contains(got, unwanted) {
 			t.Fatalf("printServerLinks() output = %q, want no %q", got, unwanted)
 		}
@@ -299,13 +366,15 @@ func TestPrintServerStartupWithColor(t *testing.T) {
 
 	var out bytes.Buffer
 	logger := log.New(&out, "", log.LstdFlags)
-	info := testServerInfo()
+	info := testServerInfoWithIndex()
 	info.color = true
 
 	printServerStartup(&out, logger, info)
 
 	got := out.String()
 	for _, want := range []string{
+		"\033[1mIndex\033[0m\n",
+		"  \033[36mhttp://localhost:15555/index\033[0m\n",
 		"\033[1mLinks\033[0m\n",
 		"\033[36mhttp://localhost:15555/go\033[0m   \033[2m->\033[0m \033[36mhttps://go.dev/\033[0m\n",
 		"\033[1mShortcuts\033[0m\n",
@@ -394,6 +463,31 @@ func TestHandleShortcutsClearsAndPrintsURL(t *testing.T) {
 	}
 }
 
+func TestHandleShortcutsPrintsIndexWithLinks(t *testing.T) {
+	t.Parallel()
+
+	var out bytes.Buffer
+	logger := log.New(&out, "", log.LstdFlags)
+
+	handleShortcuts(strings.NewReader("c\nu\n"), &out, logger, testServerInfoWithIndex(), func() {
+		t.Fatal("shutdown called")
+	})
+
+	got := out.String()
+	if count := strings.Count(got, "Index\n"); count != 2 {
+		t.Fatalf("Index header count = %d, want 2 in output %q", count, got)
+	}
+	if count := strings.Count(got, "http://localhost:15555/index\n"); count != 2 {
+		t.Fatalf("index link count = %d, want 2 in output %q", count, got)
+	}
+	if count := strings.Count(got, "Links\n"); count != 2 {
+		t.Fatalf("Links header count = %d, want 2 in output %q", count, got)
+	}
+	if count := strings.Count(got, "Events\n"); count != 1 {
+		t.Fatalf("Events header count = %d, want 1 in output %q", count, got)
+	}
+}
+
 func TestHandleShortcutsLogsScannerError(t *testing.T) {
 	t.Parallel()
 
@@ -425,6 +519,12 @@ func testServerInfo() serverInfo {
 			"pkg":  "https://pkg.go.dev/",
 		},
 	}
+}
+
+func testServerInfoWithIndex() serverInfo {
+	info := testServerInfo()
+	info.indexLink = stringPtr("index")
+	return info
 }
 
 func assertInOrder(t *testing.T, got string, values ...string) {

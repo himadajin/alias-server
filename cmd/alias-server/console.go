@@ -11,9 +11,10 @@ import (
 )
 
 type serverInfo struct {
-	port  int
-	links map[string]string
-	color bool
+	port      int
+	indexLink *string
+	links     map[string]string
+	color     bool
 }
 
 func printServerStartup(w io.Writer, logger *log.Logger, info serverInfo) {
@@ -26,11 +27,16 @@ func printServerStartup(w io.Writer, logger *log.Logger, info serverInfo) {
 }
 
 func printServerLinks(w io.Writer, info serverInfo) {
+	if info.indexLink != nil {
+		printServerIndex(w, info)
+		fmt.Fprintln(w)
+	}
+
 	fmt.Fprintln(w, styleBold("Links", info.color))
 	names := sortedLinkNames(info.links)
 	width := maxLocalURLWidth(info, names)
 	for _, name := range names {
-		localURL := fmt.Sprintf("http://localhost:%d/%s", info.port, name)
+		localURL := localURL(info, name)
 		targetURL := info.links[name]
 		fmt.Fprintf(
 			w,
@@ -41,6 +47,11 @@ func printServerLinks(w io.Writer, info serverInfo) {
 			styleCyan(targetURL, info.color),
 		)
 	}
+}
+
+func printServerIndex(w io.Writer, info serverInfo) {
+	fmt.Fprintln(w, styleBold("Index", info.color))
+	fmt.Fprintf(w, "  %s\n", styleCyan(localURL(info, *info.indexLink), info.color))
 }
 
 func printServerShortcuts(w io.Writer, color bool) {
@@ -93,12 +104,16 @@ func sortedLinkNames(links map[string]string) []string {
 func maxLocalURLWidth(info serverInfo, names []string) int {
 	width := 0
 	for _, name := range names {
-		localURL := fmt.Sprintf("http://localhost:%d/%s", info.port, name)
+		localURL := localURL(info, name)
 		if len(localURL) > width {
 			width = len(localURL)
 		}
 	}
 	return width
+}
+
+func localURL(info serverInfo, name string) string {
+	return fmt.Sprintf("http://localhost:%d/%s", info.port, name)
 }
 
 func stdinIsTerminal() bool {

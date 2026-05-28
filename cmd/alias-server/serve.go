@@ -22,9 +22,10 @@ func serve(options runOptions) error {
 		Handler: withRequestLogging(newHandler(options.links, options.indexLink), logger),
 	}
 	serverInfo := serverInfo{
-		port:  options.port,
-		links: options.links,
-		color: stdoutIsTerminal(),
+		port:      options.port,
+		indexLink: options.indexLink,
+		links:     options.links,
+		color:     stdoutIsTerminal(),
 	}
 
 	printServerStartup(os.Stdout, logger, serverInfo)

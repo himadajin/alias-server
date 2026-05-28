@@ -17,6 +17,7 @@ var linkNamePattern = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$
 
 type Config struct {
 	DefaultPort *int              `json:"defaultPort,omitempty"`
+	IndexLink   *string           `json:"indexLink,omitempty"`
 	Links       map[string]string `json:"links"`
 }
 
@@ -44,6 +45,14 @@ func validateConfig(config Config) error {
 	}
 	if len(config.Links) == 0 {
 		return fmt.Errorf("links must contain at least one entry")
+	}
+	if config.IndexLink != nil {
+		if !isValidLinkName(*config.IndexLink) {
+			return fmt.Errorf("invalid indexLink %q", *config.IndexLink)
+		}
+		if _, ok := config.Links[*config.IndexLink]; ok {
+			return fmt.Errorf("indexLink %q conflicts with link name", *config.IndexLink)
+		}
 	}
 
 	for name, target := range config.Links {

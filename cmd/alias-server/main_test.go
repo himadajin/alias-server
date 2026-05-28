@@ -25,6 +25,32 @@ func TestParseCLIArgsUsesDefaultPort(t *testing.T) {
 	if options.port != 15555 {
 		t.Fatalf("options.port = %d, want 15555", options.port)
 	}
+	if options.indexLink != nil {
+		t.Fatalf("options.indexLink = %q, want nil", *options.indexLink)
+	}
+}
+
+func TestParseCLIArgsUsesIndexLink(t *testing.T) {
+	t.Parallel()
+
+	file := writeTempConfig(t, `{
+		"defaultPort": 15555,
+		"indexLink": "index",
+		"links": {
+			"go": "https://go.dev/"
+		}
+	}`)
+
+	options, err := parseCLIArgs([]string{file})
+	if err != nil {
+		t.Fatalf("parseCLIArgs() error = %v", err)
+	}
+	if options.indexLink == nil {
+		t.Fatal("options.indexLink = nil, want index")
+	}
+	if *options.indexLink != "index" {
+		t.Fatalf("*options.indexLink = %q, want index", *options.indexLink)
+	}
 }
 
 func TestParseCLIArgsCLIOverrideDefaultPort(t *testing.T) {

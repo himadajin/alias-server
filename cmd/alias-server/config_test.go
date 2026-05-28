@@ -11,6 +11,7 @@ func TestLoadConfig(t *testing.T) {
 
 	file := writeTempConfig(t, `{
 		"defaultPort": 55555,
+		"indexLink": "index",
 		"links": {
 			"go": "https://go.dev/",
 			"pkg": "https://pkg.go.dev/"
@@ -30,9 +31,15 @@ func TestLoadConfig(t *testing.T) {
 	if config.Links["go"] != "https://go.dev/" {
 		t.Fatalf("config.Links[go] = %q, want https://go.dev/", config.Links["go"])
 	}
+	if config.IndexLink == nil {
+		t.Fatal("config.IndexLink = nil, want index")
+	}
+	if *config.IndexLink != "index" {
+		t.Fatalf("*config.IndexLink = %q, want index", *config.IndexLink)
+	}
 }
 
-func TestLoadConfigAllowsOmittedDefaultPort(t *testing.T) {
+func TestLoadConfigAllowsOmittedDefaultPortAndIndexLink(t *testing.T) {
 	t.Parallel()
 
 	file := writeTempConfig(t, `{
@@ -47,6 +54,29 @@ func TestLoadConfigAllowsOmittedDefaultPort(t *testing.T) {
 	}
 	if config.DefaultPort != nil {
 		t.Fatalf("config.DefaultPort = %d, want nil", *config.DefaultPort)
+	}
+	if config.IndexLink != nil {
+		t.Fatalf("config.IndexLink = %q, want nil", *config.IndexLink)
+	}
+}
+
+func TestLoadConfigAllowsNullIndexLink(t *testing.T) {
+	t.Parallel()
+
+	file := writeTempConfig(t, `{
+		"defaultPort": 55555,
+		"indexLink": null,
+		"links": {
+			"go": "https://go.dev/"
+		}
+	}`)
+
+	config, err := loadConfig(file)
+	if err != nil {
+		t.Fatalf("loadConfig() error = %v", err)
+	}
+	if config.IndexLink != nil {
+		t.Fatalf("config.IndexLink = %q, want nil", *config.IndexLink)
 	}
 }
 
@@ -107,6 +137,25 @@ func TestValidateConfigRejectsInvalidConfig(t *testing.T) {
 			config: Config{
 				DefaultPort: intPtr(55555),
 				Links:       map[string]string{"go": "go.dev"},
+			},
+		},
+		{
+			name: "invalid index link",
+			config: Config{
+				DefaultPort: intPtr(55555),
+				IndexLink:   stringPtr("Index"),
+				Links:       map[string]string{"go": "https://go.dev/"},
+			},
+		},
+		{
+			name: "index link conflicts with link name",
+			config: Config{
+				DefaultPort: intPtr(55555),
+				IndexLink:   stringPtr("index"),
+				Links: map[string]string{
+					"index": "https://example.com/",
+					"go":    "https://go.dev/",
+				},
 			},
 		},
 	}
@@ -179,5 +228,9 @@ func writeTempConfig(t *testing.T, content string) string {
 }
 
 func intPtr(value int) *int {
+	return &value
+}
+
+func stringPtr(value string) *string {
 	return &value
 }

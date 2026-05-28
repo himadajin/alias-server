@@ -7,8 +7,9 @@ import (
 )
 
 type runOptions struct {
-	port  int
-	links map[string]string
+	port      int
+	indexLink *string
+	links     map[string]string
 }
 
 func parseCLIArgs(args []string) (runOptions, error) {
@@ -34,8 +35,9 @@ func parseCLIArgs(args []string) (runOptions, error) {
 	}
 
 	return runOptions{
-		port:  resolvedPort,
-		links: config.Links,
+		port:      resolvedPort,
+		indexLink: config.IndexLink,
+		links:     config.Links,
 	}, nil
 }
 

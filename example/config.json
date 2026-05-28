@@ -1,5 +1,6 @@
 {
   "defaultPort": 15555,
+  "indexLink": "index",
   "links": {
     "go": "https://go.dev/",
     "pkg": "https://pkg.go.dev/",
